@@ -1,0 +1,1 @@
+enum TransferType { external, internal }
