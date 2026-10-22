@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:payflex/core/api_client.dart';
 import 'package:payflex/core/api_constant.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   final ApiClient _apiClient = ApiClient();
@@ -44,7 +45,6 @@ class AuthService {
         'phone': phoneNumber,
         'password': password,
       },
-      data: {},
     );
     return _parseResponse(response);
   }
@@ -57,7 +57,6 @@ class AuthService {
     final response = await _apiClient.post(
       ApiConstants.verifyEmail,
       body: {'userId': userId, 'otp': otp},
-      data: {},
     );
     return _parseResponse(response);
   }
@@ -70,7 +69,6 @@ class AuthService {
     final response = await _apiClient.post(
       ApiConstants.resendOtp,
       body: {'userId': userId, 'email': email},
-      data: {},
     );
     return _parseResponse(response);
   }
@@ -83,7 +81,6 @@ class AuthService {
     final response = await _apiClient.post(
       ApiConstants.login,
       body: {'email': email, 'password': password},
-      data: {},
     );
     return _parseResponse(response);
   }
@@ -97,7 +94,6 @@ class AuthService {
       ApiConstants.setTransactionPin,
       token: token,
       body: {'pin': pin},
-      data: {},
     );
     return _parseResponse(response);
   }
@@ -107,7 +103,6 @@ class AuthService {
     final response = await _apiClient.get(
       ApiConstants.fetchUserProfile,
       token: token,
-      headers: {},
     );
     return _parseResponse(response);
   }
@@ -144,7 +139,45 @@ class AuthService {
     }
   }
 
-  /// Handles Tier 1 / Tier 2 text-based KYC verification or passes payload directly
+  /// Handles requesting password reset OTP
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    final response = await _apiClient.post(
+      ApiConstants.forgotPassword,
+      body: {'email': email.toLowerCase().trim()},
+    );
+    return _parseResponse(response);
+  }
+
+  /// Handles verifying password reset OTP
+  Future<Map<String, dynamic>> verifyResetOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final response = await _apiClient.post(
+      ApiConstants.verifyResetOtp,
+      body: {'email': email.toLowerCase().trim(), 'otp': otp.trim()},
+    );
+    return _parseResponse(response);
+  }
+
+  /// Handles resetting password with verified OTP
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    final response = await _apiClient.post(
+      ApiConstants.resetPassword,
+      body: {
+        'email': email.toLowerCase().trim(),
+        'otp': otp.trim(),
+        'newPassword': newPassword,
+      },
+    );
+    return _parseResponse(response);
+  }
+
+  /// Handles KYC verification — uses multipart when a document file is attached
   Future<Map<String, dynamic>> submitKycVerification({
     required Map<String, dynamic> data,
     String? token,
@@ -152,27 +185,40 @@ class AuthService {
     required Map<String, String> fields,
   }) async {
     try {
-      // 1. If an image document is attached (Tier 3), use Multipart Upload
+      // 1. If an image document is attached, use Multipart Upload
       if (documentFile != null) {
-        final uri = Uri.parse(ApiConstants.verifyKyc);
+        // Build the full URL (endpoint is a relative path like /users/kyc/submit)
+        final fullUrl = ApiConstants.verifyKyc.startsWith('http')
+            ? ApiConstants.verifyKyc
+            : '${ApiConstants.baseUrl}${ApiConstants.verifyKyc}';
+        final uri = Uri.parse(fullUrl);
         final request = http.MultipartRequest('POST', uri);
 
-        // Attach Authorization Header if token exists
-        if (token != null && token.isNotEmpty) {
-          request.headers['Authorization'] = 'Bearer $token';
+        // Resolve token: use the provided one or fall back to SharedPreferences
+        String? authToken = token;
+        if (authToken == null || authToken.isEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          authToken =
+              prefs.getString('token') ??
+              prefs.getString('access_token') ??
+              prefs.getString('auth_token');
         }
+        if (authToken != null && authToken.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $authToken';
+        }
+        request.headers['Accept'] = 'application/json';
 
-        // Convert dynamic values in 'data' map to String for multipart fields
+        // Attach only the fields the backend expects
         data.forEach((key, value) {
           if (value != null) {
             request.fields[key] = value.toString();
           }
         });
 
-        // Attach Image File
+        // Attach the document image — field name must match backend Multer config
         request.files.add(
           await http.MultipartFile.fromPath(
-            'documentImage', // Must match the field name expected by Multer in Express (e.g., upload.single('documentImage'))
+            'document', // Backend expects upload.single('document')
             documentFile.path,
           ),
         );
@@ -180,15 +226,13 @@ class AuthService {
         final streamedResponse = await request.send();
         final response = await http.Response.fromStream(streamedResponse);
 
-        // Parse JSON response string
-        return jsonDecode(response.body);
+        return jsonDecode(response.body) as Map<String, dynamic>;
       }
 
-      // 2. Default JSON Post for Tier 2 (BVN/NIN standard text fields)
+      // 2. Default JSON POST for text-only submissions (BVN/NIN without document)
       final response = await _apiClient.post(
         ApiConstants.verifyKyc,
         token: token,
-        data: data,
         body: data,
       );
 

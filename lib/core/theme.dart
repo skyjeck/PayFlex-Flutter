@@ -39,4 +39,6 @@ class PayFlexColors {
   static const Color border = Color(0xFFE2E8F0); // Subtle border line color
   static const Color divider = Color(0xFFF1F5F9); // Light divider color
   static const Color error = Color(0xFFEF4444); // Bright red for debits/alerts
+
+  static const Color lemon = Color(0xFFEFFF00); // PayFlex lemon accent
 }

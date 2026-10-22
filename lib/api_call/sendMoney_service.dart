@@ -29,17 +29,16 @@ class SendMoneyService {
     return await _apiClient.post(
       ApiConstants.fetchBankUser,
       body: body,
-      data: {},
     );
   }
 
   /// Get list of supported banks
   Future<dynamic> getBanks() async {
-    return await _apiClient.get(ApiConstants.fetchBanks, headers: {});
+    return await _apiClient.get(ApiConstants.fetchBanks);
   }
 
   Future<dynamic> getWallets() async {
-    return await _apiClient.get(ApiConstants.fetchWallets, headers: {});
+    return await _apiClient.get(ApiConstants.fetchWallets);
   }
 
   /// Execute wallet-to-wallet or wallet-to-bank transfer.
@@ -67,7 +66,8 @@ class SendMoneyService {
       'accountNumber': recipient,
       if (!isInternal) ...{
         if (bankCode != null && bankCode.isNotEmpty) 'bankCode': bankCode,
-        if (accountName != null && accountName.isNotEmpty) 'accountName': accountName,
+        if (accountName != null && accountName.isNotEmpty)
+          'accountName': accountName,
       },
       if (narration != null) 'narration': narration,
       if (transactionPin != null) 'pin': transactionPin,
@@ -76,6 +76,9 @@ class SendMoneyService {
 
     developer.log('🚀 sendMoney payload: $body', name: 'SendMoneyService');
 
-    return await _apiClient.post(ApiConstants.sendMoney, body: body, data: {});
+    return await _apiClient.post(
+      ApiConstants.sendMoney,
+      body: body,
+    );
   }
 }

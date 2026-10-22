@@ -4,22 +4,37 @@ import 'package:payflex/core/utils/currency_formatter.dart';
 import 'package:payflex/api_call/wallet_service.dart';
 import 'package:payflex/core/theme.dart';
 import 'package:payflex/network/custom_exception.dart';
+import 'package:payflex/widget/app_feedback.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AddFundsModal extends StatefulWidget {
   final Function(double amount)? onFundAdded;
-  const AddFundsModal({super.key, this.onFundAdded});
+  final String? accountNumber;
+  final String? bankName;
+
+  const AddFundsModal({
+    super.key,
+    this.onFundAdded,
+    this.accountNumber,
+    this.bankName,
+  });
 
   /// Static helper to trigger the bottom sheet easily from any screen
   static void show(
     BuildContext context, {
     Function(double amount)? onFundAdded,
+    String? accountNumber,
+    String? bankName,
   }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AddFundsModal(onFundAdded: onFundAdded),
+      builder: (context) => AddFundsModal(
+        onFundAdded: onFundAdded,
+        accountNumber: accountNumber,
+        bankName: bankName,
+      ),
     );
   }
 
@@ -31,11 +46,66 @@ class _AddFundsModalState extends State<AddFundsModal> {
   int _selectedOptionIndex = 0; // 0: Bank Transfer, 1: Debit Card, 2: USSD
   final TextEditingController _amountController = TextEditingController();
 
-  final String _accountNumber = "9012345678";
-  final String _bankName = "PayFlex Microfinance Bank";
+  String _accountNumber = '';
+  String _bankName = 'PayFlex Microfinance Bank';
 
   final WalletService _walletService = WalletService();
   bool _isLoading = false;
+  bool _isLoadingAccount = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.accountNumber != null &&
+        widget.accountNumber!.isNotEmpty &&
+        widget.accountNumber != 'Not Generated') {
+      _accountNumber = widget.accountNumber!;
+      if (widget.bankName != null && widget.bankName!.isNotEmpty) {
+        _bankName = widget.bankName!;
+      }
+    } else {
+      _fetchAccountDetails();
+    }
+  }
+
+  Future<void> _fetchAccountDetails() async {
+    setState(() => _isLoadingAccount = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token') ?? '';
+      final response = await _walletService.getWalletBalance(token);
+
+      if (response is Map<String, dynamic>) {
+        final virtualAccount =
+            response['virtualAccount'] ?? response['virtual_account'];
+        String? fetchedAccount;
+        String? fetchedBank;
+
+        if (virtualAccount != null && virtualAccount is Map) {
+          fetchedAccount = virtualAccount['accountNumber']?.toString() ??
+              virtualAccount['account_number']?.toString();
+          fetchedBank = virtualAccount['bankName']?.toString() ??
+              virtualAccount['bank_name']?.toString();
+        }
+
+        fetchedAccount ??= response['accountNumber']?.toString() ??
+            response['account_number']?.toString();
+
+        if (mounted && fetchedAccount != null && fetchedAccount.isNotEmpty) {
+          setState(() {
+            _accountNumber = fetchedAccount!;
+            if (fetchedBank != null && fetchedBank.isNotEmpty) {
+              _bankName = fetchedBank;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('Failed to fetch virtual account details: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingAccount = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -51,13 +121,7 @@ class _AddFundsModalState extends State<AddFundsModal> {
 
     if (amount <= 0) {
       print("Validation failed: amount is <= 0");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid amount.'),
-          backgroundColor: PayFlexColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppFeedback.error(context, 'Please enter a valid amount.');
       return;
     }
 
@@ -80,33 +144,15 @@ class _AddFundsModalState extends State<AddFundsModal> {
         widget.onFundAdded!(amount);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Successfully initiated funding for ${CurrencyFormatter.formatAmount(amount, symbol: '₦')}'),
-          backgroundColor: PayFlexColors.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppFeedback.success(context, 'Successfully initiated funding for ${CurrencyFormatter.formatAmount(amount, symbol: '₦')}');
     } on AppException catch (e) {
       print("Caught AppException: ${e.message}");
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message ?? 'Failed to initiate funding.'),
-          backgroundColor: PayFlexColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppFeedback.error(context, e.message ?? 'Failed to initiate funding.');
     } catch (e) {
       print("Caught unexpected exception: $e");
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('An unexpected error occurred. Please try again.'),
-          backgroundColor: PayFlexColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppFeedback.error(context, 'An unexpected error occurred. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -114,14 +160,7 @@ class _AddFundsModalState extends State<AddFundsModal> {
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label copied to clipboard!'),
-        backgroundColor: PayFlexColors.primary,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppFeedback.copy(context, label);
   }
 
   @override
@@ -253,6 +292,12 @@ class _AddFundsModalState extends State<AddFundsModal> {
 
   // 1. Bank Transfer View
   Widget _buildBankTransferSection() {
+    final String displayAccount = _isLoadingAccount
+        ? 'Loading...'
+        : (_accountNumber.isNotEmpty && _accountNumber != 'Not Generated'
+            ? _accountNumber
+            : 'Not Generated');
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -310,23 +355,31 @@ class _AddFundsModalState extends State<AddFundsModal> {
               Row(
                 children: [
                   Text(
-                    _accountNumber,
-                    style: const TextStyle(
-                      color: PayFlexColors.primary,
+                    displayAccount,
+                    style: TextStyle(
+                      color: _accountNumber.isNotEmpty &&
+                              _accountNumber != 'Not Generated' &&
+                              !_isLoadingAccount
+                          ? PayFlexColors.primary
+                          : PayFlexColors.textMuted,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () =>
-                        _copyToClipboard(_accountNumber, 'Account Number'),
-                    child: const Icon(
-                      Icons.copy_rounded,
-                      color: PayFlexColors.primary,
-                      size: 18,
+                  if (_accountNumber.isNotEmpty &&
+                      _accountNumber != 'Not Generated' &&
+                      !_isLoadingAccount) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () =>
+                          _copyToClipboard(_accountNumber, 'Account Number'),
+                      child: const Icon(
+                        Icons.copy_rounded,
+                        color: PayFlexColors.primary,
+                        size: 18,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],
@@ -454,7 +507,10 @@ class _AddFundsModalState extends State<AddFundsModal> {
 
   // 3. USSD Code View
   Widget _buildUssdSection() {
-    final String ussdCode = "*737*50*000*$_accountNumber#";
+    final String ussdCode = _accountNumber.isNotEmpty &&
+            _accountNumber != 'Not Generated'
+        ? "*737*50*000*$_accountNumber#"
+        : "Generate account first";
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -473,25 +529,32 @@ class _AddFundsModalState extends State<AddFundsModal> {
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              SelectableText(
-                ussdCode,
-                style: const TextStyle(
-                  color: PayFlexColors.primary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
+              Flexible(
+                child: SelectableText(
+                  ussdCode,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: PayFlexColors.primary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: () => _copyToClipboard(ussdCode, 'USSD Code'),
-                child: const Icon(
-                  Icons.copy_rounded,
-                  color: PayFlexColors.primary,
-                  size: 20,
+              if (_accountNumber.isNotEmpty &&
+                  _accountNumber != 'Not Generated') ...[
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () => _copyToClipboard(ussdCode, 'USSD Code'),
+                  child: const Icon(
+                    Icons.copy_rounded,
+                    color: PayFlexColors.primary,
+                    size: 20,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ],

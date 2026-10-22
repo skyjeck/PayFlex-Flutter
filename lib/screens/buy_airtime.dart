@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:payflex/core/utils/currency_formatter.dart';
 import 'package:payflex/api_call/airtime_service.dart';
 import 'package:payflex/core/theme.dart';
+import 'package:payflex/widget/app_feedback.dart';
 import 'package:payflex/widget/pin_modal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -110,12 +111,11 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
   }
 
   void _showSnackBar(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? PayFlexColors.error : PayFlexColors.primary,
-      ),
-    );
+    if (isError) {
+      AppFeedback.error(context, msg);
+    } else {
+      AppFeedback.success(context, msg);
+    }
   }
 
   Map<String, dynamic> _getOperatorTheme(String name) {

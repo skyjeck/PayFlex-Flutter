@@ -30,7 +30,6 @@ class FxSwapService {
       final response = await _apiClient.get(
         endpoint,
         token: token,
-        headers: {},
       );
 
       if (response is Map<String, dynamic> && response['success'] == true) {
@@ -62,7 +61,6 @@ class FxSwapService {
           'to_currency': toCurrency,
           'amount': amount,
         },
-        data: {},
       );
 
       if (response is Map<String, dynamic> && response['success'] == true) {
@@ -100,7 +98,6 @@ class FxSwapService {
           'rate': rate,
           'pin': pin,
         },
-        data: {},
       );
 
       if (response is Map<String, dynamic>) {
@@ -152,11 +149,13 @@ class FxSwapService {
     final double targetAmount = amountInNgn / toRateInNgn;
     final double effectiveRate = fromRateInNgn / toRateInNgn;
 
+    final double mockFee = from == 'NGN' ? 1000.0 : 0.65;
+
     return {
       'success': true,
       'rate': effectiveRate,
       'destinationAmount': double.parse(targetAmount.toStringAsFixed(2)),
-      'fee': 0.00,
+      'feeCharged': mockFee,
     };
   }
 }

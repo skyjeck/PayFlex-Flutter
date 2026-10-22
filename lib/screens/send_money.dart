@@ -91,7 +91,16 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               .toList();
 
           if (_wallets.isNotEmpty) {
-            _selectedWallet = _wallets.first;
+            // Default to NGN wallet; fall back to first wallet if no NGN found
+            _selectedWallet = _wallets.firstWhere(
+              (w) {
+                final code = (w['currency_code'] ?? w['currency'] ?? '')
+                    .toString()
+                    .toUpperCase();
+                return code == 'NGN';
+              },
+              orElse: () => _wallets.first,
+            );
           }
 
           // Extract banks

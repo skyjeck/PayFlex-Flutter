@@ -5,7 +5,20 @@ import 'package:payflex/core/theme.dart';
 import 'package:payflex/api_call/auth_service.dart';
 
 class SetTransactionPinScreen extends StatefulWidget {
-  const SetTransactionPinScreen({super.key});
+  final bool isForcedOnLogin;
+  final String? tempToken;
+  final String? tempUserId;
+  final String? tempUserName;
+  final bool? tempIsVerified;
+
+  const SetTransactionPinScreen({
+    super.key,
+    this.isForcedOnLogin = false,
+    this.tempToken,
+    this.tempUserId,
+    this.tempUserName,
+    this.tempIsVerified,
+  });
 
   @override
   State<SetTransactionPinScreen> createState() =>
@@ -96,7 +109,7 @@ class _SetTransactionPinScreenState extends State<SetTransactionPinScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      final token = widget.tempToken ?? prefs.getString('token');
 
       if (token == null || token.isEmpty) {
         throw Exception('Session expired. Please log in again.');
@@ -109,6 +122,20 @@ class _SetTransactionPinScreenState extends State<SetTransactionPinScreen> {
 
       if (!mounted) return;
 
+      if (widget.isForcedOnLogin) {
+        await prefs.setString('token', widget.tempToken!);
+        await prefs.setString('userId', widget.tempUserId!);
+        await prefs.setString('userName', widget.tempUserName!);
+        await prefs.setBool('isVerified', widget.tempIsVerified!);
+      }
+
+      // Mark PIN as set in local storage so login never redirects here again
+      await prefs.setBool('isPinSet', true);
+      final userId = widget.tempUserId ?? prefs.getString('userId');
+      if (userId != null && userId.isNotEmpty) {
+        await prefs.setBool('isPinSet_$userId', true);
+      }
+
       final message =
           response['message'] ?? 'Transaction PIN created successfully.';
 
@@ -119,7 +146,13 @@ class _SetTransactionPinScreenState extends State<SetTransactionPinScreen> {
         ),
       );
 
-      Navigator.pop(context, true);
+      if (!mounted) return;
+
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/dashboard',
+        (route) => false,
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -136,31 +169,51 @@ class _SetTransactionPinScreenState extends State<SetTransactionPinScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: PayFlexColors.background,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        if (_isConfirming) {
+          setState(() {
+            _isConfirming = false;
+            _firstPin = '';
+            _errorMessage = '';
+          });
+          _clearPinFields();
+          return false;
+        } else if (widget.isForcedOnLogin) {
+          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
         backgroundColor: PayFlexColors.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: PayFlexColors.textPrimary,
-            size: 20,
+        appBar: AppBar(
+          backgroundColor: PayFlexColors.background,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: PayFlexColors.textPrimary,
+              size: 20,
+            ),
+            onPressed: () {
+              if (_isConfirming) {
+                setState(() {
+                  _isConfirming = false;
+                  _firstPin = '';
+                  _errorMessage = '';
+                });
+                _clearPinFields();
+              } else {
+                if (widget.isForcedOnLogin) {
+                  Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                } else {
+                  Navigator.pop(context);
+                }
+              }
+            },
           ),
-          onPressed: () {
-            if (_isConfirming) {
-              setState(() {
-                _isConfirming = false;
-                _firstPin = '';
-                _errorMessage = '';
-              });
-              _clearPinFields();
-            } else {
-              Navigator.pop(context);
-            }
-          },
         ),
-      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
@@ -300,6 +353,7 @@ class _SetTransactionPinScreenState extends State<SetTransactionPinScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

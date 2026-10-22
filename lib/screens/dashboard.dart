@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:payflex/screens/TransactioHistory.dart';
 import 'package:payflex/screens/kycVerifcation.dart';
+import 'package:payflex/screens/loan_screen.dart';
 import 'package:payflex/screens/set_transaction_pin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:payflex/core/utils/currency_formatter.dart';
@@ -56,7 +57,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDashboardData() async {
-    await Future.wait([_fetchBalance(), _fetchRecentTransactions(), _fetchUserProfile()]);
+    await Future.wait([
+      _fetchBalance(),
+      _fetchRecentTransactions(),
+      _fetchUserProfile(),
+    ]);
   }
 
   Future<void> _fetchUserProfile() async {
@@ -274,10 +279,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadDashboardData();
   }
 
+  void _navigateToSetPin() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SetTransactionPinScreen()),
+    );
+    _loadDashboardData();
+  }
+
   void _navigateToSwapFx() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const FxSwapScreen()),
+    );
+    _loadDashboardData();
+  }
+
+  void _navigateToLoan() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LoanScreen()),
     );
     _loadDashboardData();
   }
@@ -321,12 +342,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadDashboardData();
   }
 
-  void _showAddFundsModal() {
+  void _showAddFundsModal() async {
+    // Guard: only allow adding funds if the user is verified and has a virtual account
+    final prefs = await SharedPreferences.getInstance();
+    final isVerified = prefs.getBool('isVerified') ?? false;
+
+    if (!mounted) return;
+
+    if (!isVerified) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please verify your email before adding funds.'),
+          backgroundColor: PayFlexColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_accountNumber == 'Not Generated') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please generate your virtual account number before adding funds.',
+          ),
+          backgroundColor: PayFlexColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => AddFundsModal(
+        accountNumber: _accountNumber,
         onFundAdded: (amount) {
           _loadDashboardData();
         },
@@ -493,10 +545,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: CircleAvatar(
                       radius: 28,
                       backgroundColor: PayFlexColors.iconBg,
-                      backgroundImage: _profileImage.isNotEmpty ? NetworkImage(_profileImage) : null,
+                      backgroundImage: _profileImage.isNotEmpty
+                          ? NetworkImage(_profileImage)
+                          : null,
                       child: _profileImage.isEmpty
                           ? Text(
-                              _userName.isNotEmpty ? _userName[0].toUpperCase() : 'U',
+                              _userName.isNotEmpty
+                                  ? _userName[0].toUpperCase()
+                                  : 'U',
                               style: const TextStyle(
                                 color: PayFlexColors.primary,
                                 fontSize: 18,
@@ -566,15 +622,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToWallet();
-                  },
-                ),
-                _buildDrawerTile(
-                  icon: Icons.receipt_long_outlined,
-                  activeIcon: Icons.receipt_long_rounded,
-                  title: 'Set Transaction Pin',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _fetchRecentTransactions();
                   },
                 ),
 
@@ -879,6 +926,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         _buildActionButton(Icons.receipt_rounded, 'Bills', _navigateToBills),
         _buildActionButton(Icons.monetization_on, 'SwapFx', _navigateToSwapFx),
+        _buildActionButton(Icons.credit_score_rounded, 'Loan', _navigateToLoan),
       ],
     );
   }

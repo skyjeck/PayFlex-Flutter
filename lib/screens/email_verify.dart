@@ -5,6 +5,7 @@ import 'package:payflex/api_call/auth_service.dart';
 import 'package:payflex/core/theme.dart';
 import 'package:payflex/network/custom_exception.dart';
 import 'package:payflex/screens/dashboard.dart';
+import 'package:payflex/screens/set_transaction_pin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
@@ -111,11 +112,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         ),
       );
 
-      // Route to Dashboard after successful verification
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-        (route) => false,
-      );
+      if (!mounted) return;
+
+      // We must redirect to LoginScreen because the user needs an auth token
+      // before they can securely set their Transaction PIN.
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     } on AppException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

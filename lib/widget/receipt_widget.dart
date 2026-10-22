@@ -183,6 +183,8 @@ class TransactionReceiptWidget extends StatelessWidget {
         _ReceiptRow(label: 'Recipient', value: txn['recipient'] ?? '—'),
         _ReceiptRow(label: 'Date', value: dateStr),
         _ReceiptRow(label: 'Reference', value: txn['reference'] ?? '—'),
+        if (txn['fee'] != null && txn['fee'].toString().isNotEmpty && txn['fee'].toString() != '0.0')
+          _ReceiptRow(label: 'Fee', value: txn['fee'].toString()),
       ],
       highlightSection: hasToken ? _TokenHighlight(token: token ?? '') : null,
     );

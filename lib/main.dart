@@ -7,10 +7,17 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('token');
   final isVerified = prefs.getBool('isVerified') ?? true;
+  final isPinSet = prefs.getBool('isPinSet') ?? false;
   
   String initialRoute = '/onboarding';
   if (token != null) {
-    initialRoute = isVerified ? '/dashboard' : '/login';
+    if (!isVerified) {
+      initialRoute = '/login';
+    } else if (!isPinSet) {
+      initialRoute = '/login';
+    } else {
+      initialRoute = '/dashboard';
+    }
   }
   
   runApp(MyApp(initialRoute: initialRoute));

@@ -67,7 +67,6 @@ class ApiClient {
     String endpoint, {
     String? token,
     Map<String, String>? queryParameters,
-    required Map<String, String> headers,
   }) async {
     final uri = Uri.parse(
       '${ApiConstants.baseUrl}$endpoint',
@@ -83,7 +82,6 @@ class ApiClient {
     String endpoint, {
     Map<String, dynamic>? body,
     String? token,
-    required Map<String, dynamic> data,
   }) async {
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     return _sendRequest(

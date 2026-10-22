@@ -30,7 +30,7 @@ class TransactionService {
     final queryString = Uri(queryParameters: queryParams).query;
     final endpoint = '${ApiConstants.transactionHistory}?$queryString';
 
-    final response = await _apiClient.get(endpoint, token: token, headers: {});
+    final response = await _apiClient.get(endpoint, token: token);
 
     if (response is Map<String, dynamic> && response['success'] == true) {
       return response;
@@ -50,7 +50,7 @@ class TransactionService {
   }) async {
     final endpoint = '${ApiConstants.transactionHistory}/$transactionId';
 
-    final response = await _apiClient.get(endpoint, token: token, headers: {});
+    final response = await _apiClient.get(endpoint, token: token);
 
     if (response is Map<String, dynamic> && response['success'] == true) {
       return response;

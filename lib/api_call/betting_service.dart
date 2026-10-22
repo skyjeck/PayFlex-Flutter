@@ -12,7 +12,6 @@ class BettingService {
     final response = await _apiClient.get(
       ApiConstants.bettingProviders,
       token: token,
-      headers: {},
     );
 
     final rawList = response['data'] ?? response['providers'] ?? response;
@@ -35,7 +34,6 @@ class BettingService {
         'provider': provider.toLowerCase().trim(),
         'customerId': customerId.trim(),
       },
-      data: {},
     );
 
     return Map<String, dynamic>.from(response);
@@ -62,7 +60,6 @@ class BettingService {
       ApiConstants.fundBettingWallet,
       token: token,
       body: payload,
-      data: {},
     );
 
     return Map<String, dynamic>.from(response);

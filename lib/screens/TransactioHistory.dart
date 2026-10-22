@@ -166,15 +166,34 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         moduleTag.contains('data') ||
         (raw['isDebit'] == true);
 
-    final String title =
-        raw['title'] ??
-        raw['narration'] ??
-        raw['recipient_name'] ??
-        raw['recipientName'] ??
-        raw['description'] ??
-        (raw['type'] != null
-            ? raw['type'].toString().toUpperCase()
-            : moduleTag.toUpperCase());
+    // Build a human-friendly title, especially for swap transactions
+    String title;
+    if (moduleTag == 'swap') {
+      // Use from/to currency fields to build a descriptive swap label
+      final from =
+          (raw['fromCurrency'] ?? raw['from_currency'] ?? raw['sourceCurrency'] ?? '').toString().toUpperCase();
+      final to =
+          (raw['toCurrency'] ?? raw['to_currency'] ?? raw['destinationCurrency'] ?? '').toString().toUpperCase();
+      if (from.isNotEmpty && to.isNotEmpty) {
+        title = 'FX Swap: $from → $to';
+      } else if (from.isNotEmpty) {
+        title = 'FX Swap: $from';
+      } else {
+        title = raw['title'] ?? raw['description'] ?? 'FX Swap';
+      }
+    } else {
+      title =
+          raw['title'] ??
+          raw['narration'] ??
+          raw['recipient_name'] ??
+          raw['recipientName'] ??
+          raw['description'] ??
+          (raw['type'] != null && raw['type'].toString().isNotEmpty
+              ? raw['type'].toString().toUpperCase()
+              : moduleTag.isNotEmpty
+                  ? moduleTag.toUpperCase()
+                  : 'Transaction');
+    }
 
     final double rawAmount =
         double.tryParse((raw['amount'] ?? 0).toString()) ?? 0.0;
@@ -252,6 +271,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           raw['accountName'] ??
           '',
       'token': token,
+      'fee': raw['feeCharged'] ?? raw['fee'] ?? raw['serviceCharge'] ?? '',
     };
   }
 

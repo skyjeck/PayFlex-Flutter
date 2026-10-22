@@ -7,6 +7,7 @@ import 'package:payflex/screens/forgot_password.dart';
 import 'package:payflex/screens/signup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:payflex/network/custom_exception.dart';
+import 'package:payflex/screens/set_transaction_pin.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -84,11 +85,15 @@ class _LoginScreenState extends State<LoginScreen> {
               rawVerified.toString() == '1';
         }
       }
-
-      await prefs.setString('token', token);
-      await prefs.setString('userId', userId);
-      await prefs.setString('userName', firstName); // <--- Save name to cache
-      await prefs.setBool('isVerified', isEmailVerified);
+      // isPinSet: if API explicitly returns it, use that.
+      // Otherwise, fall back to what's stored locally for THIS specific user.
+      final rawIsPinSet = responseData?['isPinSet'] ?? response['isPinSet'];
+      bool isPinSet;
+      if (rawIsPinSet != null) {
+        isPinSet = (rawIsPinSet == true);
+      } else {
+        isPinSet = prefs.getBool('isPinSet_$userId') ?? false;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -110,7 +115,29 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         );
+      } else if (!isPinSet) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => SetTransactionPinScreen(
+              isForcedOnLogin: true,
+              tempToken: token,
+              tempUserId: userId,
+              tempUserName: firstName,
+              tempIsVerified: isEmailVerified,
+            ),
+          ),
+        );
       } else {
+        await prefs.setString('token', token);
+        await prefs.setString('userId', userId);
+        await prefs.setString('userName', firstName); // <--- Save name to cache
+        await prefs.setBool('isVerified', isEmailVerified);
+
+        // Save it scoped to the userId so switching accounts doesn't bleed state
+        await prefs.setBool('isPinSet_$userId', isPinSet);
+        // We also keep the global one for main.dart to easily read on app startup
+        await prefs.setBool('isPinSet', isPinSet);
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );

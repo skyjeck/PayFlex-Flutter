@@ -31,30 +31,44 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       final email = _emailController.text.trim().toLowerCase();
 
-      // Call your backend forgot-password or password-reset endpoint
-      // final response = await _authService.forgotPassword(email: email);
+      // Execute API Call
+      final response = await _authService.forgotPassword(email: email);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password reset link sent! Check your email.'),
-          backgroundColor: PayFlexColors.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (response['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              response['message'] ?? 'Verification code sent to your email!',
+            ),
+            backgroundColor: PayFlexColors.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
 
-      // Optionally pop back to login screen after success
-      Navigator.of(context).pop();
+        // Navigate to 6-digit OTP screen passing user's email
+        Navigator.pushNamed(context, '/verify-reset-otp', arguments: email);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Failed to send reset code.'),
+            backgroundColor: PayFlexColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } on AppException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message ?? 'Failed to send reset link. Try again.'),
+          content: Text(e.message ?? 'Failed to send reset code. Try again.'),
           backgroundColor: PayFlexColors.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('An unexpected error occurred. Please try again.'),
@@ -103,7 +117,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Enter your email address below to receive a link to reset your password.',
+                  'Enter your email address below to receive a 6-digit reset code.',
                   style: TextStyle(
                     color: Color(0xFFA0A0A0),
                     fontSize: 14,
@@ -175,7 +189,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: const BorderSide(
-                            color: Colors.redAccent,
+                            color: PayFlexColors.error,
                             width: 1,
                           ),
                         ),
@@ -193,11 +207,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleForgotPassword,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00E676),
+                      backgroundColor: PayFlexColors.primary,
                       foregroundColor: Colors.black,
-                      disabledBackgroundColor: const Color(
-                        0xFF00E676,
-                      ).withOpacity(0.5),
+                      disabledBackgroundColor: PayFlexColors.primary
+                          .withOpacity(0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -213,7 +226,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                           )
                         : const Text(
-                            'Send Reset Link',
+                            'Send Reset Code',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

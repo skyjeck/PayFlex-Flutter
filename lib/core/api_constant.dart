@@ -5,10 +5,19 @@ import 'package:flutter/foundation.dart';
 
 class ApiConstants {
   // Base URL handler (Handles Android Emulator vs iOS/Web localhost)
+  // static String get baseUrl {
+  //   if (kIsWeb) return 'http://localhost:4000/api';
+  //   if (Platform.isAndroid) return 'http://10.0.2.2:4000/api';
+  //   return 'http://localhost:4000/api';
+  // }
+
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:4000/api';
-    if (Platform.isAndroid) return 'http://10.0.2.2:4000/api';
-    return 'http://localhost:4000/api';
+    if (Platform.isAndroid)
+      return 'http://10.0.2.2:4000/api'; // Android Emulator
+
+    // Physical iOS / Physical Android / macOS target
+    return 'http://192.168.1.138:4000/api';
   }
 
   // Authentication Endpoints
@@ -20,6 +29,9 @@ class ApiConstants {
   static const String setTransactionPin = '/users/set-pin';
   static const String fetchUserProfile = '/users/profile';
   static const String updateUserProfile = '/users/update';
+  static const String forgotPassword = '/users/forgot-password';
+  static const String verifyResetOtp = '/users/verify-reset-otp';
+  static const String resetPassword = '/users/reset-password';
 
   // Wallet & banks Endpoints
   static const String walletBalance = '/wallet/balance';
@@ -63,6 +75,11 @@ class ApiConstants {
   static const String fxQuote = '/swap-fx/quote';
   static const String fxExecute = '/swap-fx/swap';
   static const String fxHistory = '/swap-fx/history';
+
+  // loans
+  static const String applyLoan = '/loan/apply';
+  static const String myLoan = '/loan/my-loans';
+  static const String repayLoan = '/loan/repay';
 
   //notifications
 

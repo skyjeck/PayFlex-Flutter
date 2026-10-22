@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:payflex/core/theme.dart';
+import 'package:payflex/screens/login.dart';
 import 'package:payflex/screens/signup.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -57,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       // Navigate to Login/Home screen
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const SignUpScreen()),
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
     }
   }

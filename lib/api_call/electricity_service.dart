@@ -103,11 +103,18 @@ class ElectricityService {
     final url = '${ApiConstants.baseUrl}${ApiConstants.subscribeElectricity}';
     final formattedProvider = _normalizeProviderSlug(provider);
 
+    // Send amount as integer — most VTU/electricity APIs reject float values.
+    // Also include customerId (= meterNumber) to match the verifyMeter convention
+    // and provide snake_case aliases for broader backend compatibility.
+    final int amountInt = amount.toInt();
     final payload = {
       'provider': formattedProvider,
       'meterNumber': meterNumber,
+      'meter_number': meterNumber,   // snake_case alias
+      'customerId': meterNumber,     // matches verifyMeter convention
       'meterType': meterType.toLowerCase(),
-      'amount': amount,
+      'meter_type': meterType.toLowerCase(), // snake_case alias
+      'amount': amountInt,
       'phone': phone,
       'pin': pin,
     };
@@ -123,6 +130,7 @@ class ElectricityService {
       body: jsonEncode(payload),
     );
 
+    print('📩 Pay Electricity Status: ${response.statusCode}');
     print('📩 Pay Electricity Response: ${response.body}');
     _checkUnauthorized(response);
 

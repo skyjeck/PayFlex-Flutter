@@ -70,30 +70,70 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
   }
 
   String _resolveTierLabel(Map<String, dynamic> profile) {
+    final String kycStatus = (profile['kycStatus'] ?? '')
+        .toString()
+        .toLowerCase();
+    final bool kycVerified = profile['kycVerified'] == true;
+
+    // Check for a pending higher tier submission (Tier 3 pending admin review)
+    // Backend may return pendingTier, targetTier, or kycPendingTier
+    final dynamic rawPendingTier = profile['pendingTier'] ??
+        profile['targetTier'] ??
+        profile['kycPendingTier'] ??
+        profile['kycTargetTier'];
+    if (rawPendingTier != null) {
+      int? pendingNum;
+      if (rawPendingTier is int) {
+        pendingNum = rawPendingTier;
+      } else {
+        final match = RegExp(r'\d+').firstMatch(rawPendingTier.toString());
+        if (match != null) {
+          pendingNum = int.tryParse(match.group(0)!);
+        }
+      }
+      
+      if (pendingNum != null) {
+        if (kycStatus == 'pending') {
+          if (pendingNum >= 3) return 'Tier 3 (Pending Review)';
+          if (pendingNum == 2) return 'Tier 2 (Pending Review)';
+        } else if (kycStatus == 'verified') {
+          if (pendingNum >= 3) return 'Tier 3 (Fully Verified)';
+          if (pendingNum == 2) return 'Tier 2 (Fully Verified)';
+        }
+      }
+    }
+
+    // Resolve the user's current confirmed tier
     final dynamic rawTier =
         profile['kycTier'] ?? profile['tier'] ?? profile['verificationTier'];
     if (rawTier != null) {
-      final int? tierNum = rawTier is int
-          ? rawTier
-          : int.tryParse(rawTier.toString());
+      int? tierNum;
+      if (rawTier is int) {
+        tierNum = rawTier;
+      } else {
+        final match = RegExp(r'\d+').firstMatch(rawTier.toString());
+        if (match != null) {
+          tierNum = int.tryParse(match.group(0)!);
+        }
+      }
+
       if (tierNum != null) {
-        if (tierNum >= 2) return 'Tier 2 (Fully Verified)';
+        if (tierNum >= 3) return 'Tier 3 (Fully Verified)';
+        if (tierNum == 2 && kycStatus == 'pending') return 'Tier 3 (Pending Review)';
+        if (tierNum == 2) return 'Tier 2 (Fully Verified)';
+        if (tierNum == 1 && kycStatus == 'pending') return 'Tier 2 (Pending Review)';
         if (tierNum == 1) return 'Tier 1 (Basic Verified)';
+        if (tierNum == 0 && kycStatus == 'pending') return 'Tier 1 (Pending Review)';
         return 'Tier 0 (Unverified)';
       }
       final String tierStr = rawTier.toString().trim();
       if (tierStr.isNotEmpty) return tierStr;
     }
 
-    final String kycStatus = (profile['kycStatus'] ?? '')
-        .toString()
-        .toLowerCase();
-    final bool kycVerified = profile['kycVerified'] == true;
-
     if (kycStatus == 'verified' || kycVerified) {
       return 'Tier 2 (Fully Verified)';
     } else if (kycStatus == 'pending') {
-      return 'Tier 1 (Under Review)';
+      return 'Tier 3 (Pending Review)';
     }
     return 'Tier 0 (Unverified)';
   }
@@ -389,17 +429,36 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
         .toLowerCase();
     final isKycVerified = _profile['kycVerified'] ?? false;
 
+    // Determine if this is a Tier 3 pending review specifically
+    final bool isTier3Pending = _verificationTier.contains('Tier 3') &&
+        _verificationTier.contains('Pending');
+    final bool isTier3Verified = _verificationTier.contains('Tier 3') &&
+        _verificationTier.contains('Fully Verified');
+    final bool isTier2Verified = _verificationTier.contains('Tier 2') &&
+        _verificationTier.contains('Fully Verified');
+
     Color badgeBgColor;
     Color badgeTextColor;
     String badgeText;
     String statusSubtitle;
     bool showUpgradeButton = false;
 
-    if (kycStatus == 'verified' || isKycVerified) {
+    if (isTier3Verified) {
       badgeBgColor = PayFlexColors.primaryLight;
       badgeTextColor = PayFlexColors.primary;
       badgeText = 'Verified';
-      statusSubtitle = 'Tier limits fully unlocked';
+      statusSubtitle = 'All tier limits fully unlocked';
+    } else if (isTier2Verified) {
+      badgeBgColor = PayFlexColors.primaryLight;
+      badgeTextColor = PayFlexColors.primary;
+      badgeText = 'Verified (Tier 2)';
+      statusSubtitle = 'Tap to upgrade to Tier 3 limits';
+      showUpgradeButton = true;
+    } else if (isTier3Pending) {
+      badgeBgColor = Colors.orange.shade50;
+      badgeTextColor = Colors.orange.shade800;
+      badgeText = 'Pending Review';
+      statusSubtitle = 'Awaiting admin approval for Tier 3';
     } else if (kycStatus == 'pending') {
       badgeBgColor = Colors.orange.shade50;
       badgeTextColor = Colors.orange.shade800;
@@ -420,7 +479,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
     }
 
     return InkWell(
-      onTap: (kycStatus != 'verified' && !isKycVerified)
+      onTap: (!isTier3Verified && !isTier3Pending)
           ? _navigateToKyc
           : null,
       borderRadius: BorderRadius.circular(18),
